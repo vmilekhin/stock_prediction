@@ -53,7 +53,7 @@ with st.sidebar:
     )
     
     days = st.slider("Горизонт прогноза (дней)", 7, 30, 14)
-    predict_btn = st.button("Рассчитать прогноз", use_container_width=True)
+    predict_btn = st.button("Рассчитать прогноз", width="stretch")
 
 # Основной блок
 conn = get_conn()
@@ -105,9 +105,9 @@ fig.update_layout(
     hovermode="x unified",
     margin=dict(l=20, r=20, t=20, b=20)
 )
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 
 # Таблица
 st.subheader("Последние прогнозы из базы")
 recent = load_recent_predictions(10)
-st.dataframe(recent, use_container_width=True)
+st.dataframe(recent, width="stretch")
