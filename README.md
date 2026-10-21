@@ -41,3 +41,49 @@ erDiagram
         varchar model_name
         timestamp created_at
     }
+
+## ⚙️ Что делает программа
+1. **ETL-скрипт (`etl/load_prices.py`)**: скачивает историю с Yahoo Finance за 5 лет и загружает в базу. Используется `ON CONFLICT`, чтобы при повторном запуске не было дублей.
+2. **Модуль предсказания (`etl/predict.py`)**: берет данные из таблицы `historical_prices`, обучает модель `ARIMA` из `statsmodels` и сохраняет прогноз обратно в таблицу `predictions`.
+3. **Веб-интерфейс (`app.py`)**: написан на Streamlit. Позволяет выбрать тикер из базы, задать горизонт прогноза и посмотреть график.
+
+## 🚀 Как запустить
+1. Создать базу данных:
+   `createdb stock_prediction`
+2. Применить схему:
+   `psql -d stock_prediction -f sql/schema.sql`
+   `psql -d stock_prediction -f sql/seed_tickers.sql`
+3. Установить зависимости:
+   `pip install -r requirements.txt`
+4. Запустить загрузку данных (займет ~15 сек):
+   `python etl/load_prices.py --period 5y`
+5. Запустить интерфейс:
+   `streamlit run app.py`
+
+## 🛠️ Трудности при разработке
+* В начале данные дублировались при повторной загрузке, решил через `ON CONFLICT (ticker_id, trade_date)`.
+* `statsmodels` выдавал ошибку `No supported index` из-за пропусков (выходных) в датах. Пришлось сбрасывать индекс перед обучением.
+* В интерфейсе при вычитании цен из БД (тип `Decimal`) и прогноза (тип `float`) вылетал `TypeError`. Исправил явным приведением типов.
+
+## ⚙️ Что делает программа
+1. **ETL-скрипт (`etl/load_prices.py`)**: скачивает историю с Yahoo Finance за 5 лет и загружает в базу. Используется `ON CONFLICT`, чтобы при повторном запуске не было дублей.
+2. **Модуль предсказания (`etl/predict.py`)**: берет данные из таблицы `historical_prices`, обучает модель `ARIMA` из `statsmodels` и сохраняет прогноз обратно в таблицу `predictions`.
+3. **Веб-интерфейс (`app.py`)**: написан на Streamlit. Позволяет выбрать тикер из базы, задать горизонт прогноза и посмотреть график.
+
+## 🚀 Как запустить
+1. Создать базу данных:
+   `createdb stock_prediction`
+2. Применить схему:
+   `psql -d stock_prediction -f sql/schema.sql`
+   `psql -d stock_prediction -f sql/seed_tickers.sql`
+3. Установить зависимости:
+   `pip install -r requirements.txt`
+4. Запустить загрузку данных (займет ~15 сек):
+   `python etl/load_prices.py --period 5y`
+5. Запустить интерфейс:
+   `streamlit run app.py`
+
+## 🛠️ Трудности при разработке
+* В начале данные дублировались при повторной загрузке, решил через `ON CONFLICT (ticker_id, trade_date)`.
+* `statsmodels` выдавал ошибку `No supported index` из-за пропусков (выходных) в датах. Пришлось сбрасывать индекс перед обучением.
+* В интерфейсе при вычитании цен из БД (тип `Decimal`) и прогноза (тип `float`) вылетал `TypeError`. Исправил явным приведением типов.
