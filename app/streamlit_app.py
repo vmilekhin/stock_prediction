@@ -1,7 +1,3 @@
-"""
-Streamlit UI для Stock Prediction.
-Запуск: streamlit run app/streamlit_app.py
-"""
 import sys
 from pathlib import Path
 
@@ -15,65 +11,60 @@ import streamlit as st
 from etl.predict import DB_CONFIG, get_ticker, load_history, fit_and_forecast, save_predictions
 
 # --- Настройки страницы ---
-st.set_page_config(page_title="Stock Insight", page_icon="📈", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Stock Prediction", page_icon="🚀", layout="wide", initial_sidebar_state="expanded")
 
-# --- Кастомный CSS (делаем UI человеческим) ---
+# --- Красивый CSS (сделано с душой) ---
 st.markdown("""
 <style>
-    /* Импорт шрифта Inter */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap');
     
     html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-        color: #1E293B;
+        font-family: 'Montserrat', sans-serif;
     }
     
-    /* Фон приложения */
+    /* Легкий градиентный фон для всего приложения */
     .stApp {
-        background-color: #F8FAFC;
+        background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
     }
     
-    /* Стилизация сайдбара */
+    /* Сайдбар */
     [data-testid="stSidebar"] {
-        background-color: #FFFFFF;
-        border-right: 1px solid #E2E8F0;
+        background-color: #ffffff;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.05);
     }
     
-    /* Стилизация карточек метрик */
+    /* Карточки с метриками */
     div[data-testid="stMetric"] {
-        background-color: #FFFFFF;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        border: 1px solid #E2E8F0;
+        background-color: white;
+        padding: 15px;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        border-left: 5px solid #4A90E2; /* Синяя полоска */
     }
-    div[data-testid="stMetricLabel"] > div {
-        font-weight: 500;
-        color: #64748B !important;
-        font-size: 0.9rem;
-    }
+    /* Делаем разные цвета полосок для разных карточек */
+    div[data-testid="stMetric"]:nth-child(1) { border-left-color: #4A90E2; } /* Синий */
+    div[data-testid="stMetric"]:nth-child(2) { border-left-color: #27AE60; } /* Зеленый */
+    div[data-testid="stMetric"]:nth-child(3) { border-left-color: #8E44AD; } /* Фиолетовый */
+    
     div[data-testid="stMetricValue"] > div {
-        color: #0F172A;
+        color: #2C3E50;
         font-weight: 700;
     }
     
-    /* Кнопка Predict */
+    /* Кнопка */
     div.stButton > button {
-        background-color: #2563EB;
+        background: linear-gradient(90deg, #4A90E2 0%, #357ABD 100%);
         color: white;
-        border-radius: 8px;
+        border-radius: 10px;
         font-weight: 600;
         border: none;
-        padding: 0.6rem 1rem;
-        transition: all 0.2s ease;
+        padding: 0.6rem 2rem;
+        transition: transform 0.2s;
     }
     div.stButton > button:hover {
-        background-color: #1D4ED8;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        transform: scale(1.02);
+        color: white;
     }
-    
-    /* Убираем дефолтный футер Streamlit */
-    footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -93,122 +84,135 @@ def load_history_df(ticker_id: int, lookback: int) -> pd.DataFrame:
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT trade_date, open, high, low, close, volume FROM historical_prices "
+            "SELECT trade_date, close FROM historical_prices "
             "WHERE ticker_id = %s AND trade_date >= (CURRENT_DATE - INTERVAL '%s days') "
             "ORDER BY trade_date", (ticker_id, lookback))
         rows = cur.fetchall()
-    return pd.DataFrame(rows, columns=["trade_date", "open", "high", "low", "close", "volume"])
+    return pd.DataFrame(rows, columns=["trade_date", "close"])
 
-def load_recent_predictions(limit: int = 20) -> pd.DataFrame:
+def load_recent_predictions(limit: int = 10) -> pd.DataFrame:
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM latest_predictions LIMIT %s", (limit,))
         rows = cur.fetchall()
     return pd.DataFrame(rows, columns=["symbol", "company_name", "prediction_date", "target_date", "predicted_price", "model_name"])
 
-# --- UI Layout ---
-st.title("📈 Stock Insight")
-st.markdown("<p style='color: #64748B; font-size: 1.1rem; margin-top: -10px;'>Аналитика и прогнозирование на базе PostgreSQL + ARIMA</p>", unsafe_allow_html=True)
-st.divider()
 
-tickers_df = load_tickers()
-if tickers_df.empty:
-    st.error("В таблице tickers нет данных. Запусти sql/seed_tickers.sql.")
-    st.stop()
+# --- Заголовок ---
+st.title("📈 Предсказание курса акций")
+st.markdown("<p style='font-size: 1.1rem; color: #555;'>Курсовая работа по базам данных: ETL -> PostgreSQL -> ARIMA -> Streamlit</p>", unsafe_allow_html=True)
+st.write("---")
 
+# --- Сайдбар с параметрами ---
 with st.sidebar:
-    st.markdown("### Параметры")
+    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=80)
+    st.header("Панель управления")
+    
+    tickers_df = load_tickers()
     symbol = st.selectbox(
-        "Тикер",
+        "Выберите акцию:",
         options=tickers_df["symbol"].tolist(),
-        format_func=lambda s: f"{s} — {tickers_df.loc[tickers_df.symbol == s, 'company_name'].iloc[0]}",
+        format_func=lambda s: f"{s} ({tickers_df.loc[tickers_df.symbol == s, 'company_name'].iloc[0]})",
     )
-    days = st.slider("Горизонт (торговых дней)", 7, 30, 14)
-    lookback = st.selectbox("История для обучения (дней)", [365, 730, 1095, 1825], index=1,
-                            format_func=lambda d: f"{d} дн. (~{d // 365} г.)")
-    predict_btn = st.button("Сгенерировать прогноз", type="primary", width="stretch")
-    st.divider()
-    st.caption("Данные: Yahoo Finance\nМодель: ARIMA(2,1,2)\nБД: PostgreSQL")
+    
+    st.subheader("Настройки прогноза")
+    days = st.slider("На сколько дней вперед?", 7, 30, 14)
+    lookback = st.selectbox("Глубина истории (дней)", [365, 730, 1095], index=1)
+    
+    predict_btn = st.button("🔮 Сделать прогноз", use_container_width=True)
+    
+    st.info("💡 **Как это работает:** Модель ARIMA читает историю цен из базы данных, обучается и сохраняет результат обратно в таблицу `predictions`.")
 
+# --- Получаем данные ---
 conn = get_conn()
 ticker_id, _ = get_ticker(conn, symbol)
 hist_df = load_history_df(ticker_id, lookback)
+
+if hist_df.empty:
+    st.error(f"❌ Для тикера {symbol} нет данных в базе. Запустите ETL-скрипт.")
+    st.stop()
+
 last_price = float(hist_df['close'].iloc[-1])
 
-# Заголовок выбранной акции
-st.subheader(f"{symbol} — {tickers_df.loc[tickers_df.symbol == symbol, 'company_name'].iloc[0]}")
-
-# Блок метрик (отображается всегда)
+# --- Блок с метриками ---
 col1, col2, col3 = st.columns(3)
-col1.metric("Последняя цена", f"${last_price:.2f}")
+col1.metric("Текущая цена", f"${last_price:.2f}")
 
 forecast_df = None
 if predict_btn:
-    with st.spinner("Обучение модели и запись в БД..."):
+    with st.spinner("Нейросеть думает... (обучение ARIMA)"):
         series = load_history(conn, ticker_id, lookback)
         forecast_df = fit_and_forecast(series, days, "arima")
         save_predictions(conn, ticker_id, "arima", forecast_df)
-        st.success(f"Прогноз на {days} дней успешно сохранен в базу данных!")
     
     target_price = float(forecast_df['predicted_price'].iloc[-1])
     delta = target_price - last_price
-    col2.metric(f"Прогноз (через {days} дн.)", f"${target_price:.2f}", f"{delta:+.2f} USD", delta_color="normal")
-    col3.metric("Модель", "ARIMA (2,1,2)")
+    
+    col2.metric(f"Прогноз через {days} дн.", f"${target_price:.2f}", f"{delta:+.2f} USD")
+    col3.metric("Статус", "Сохранено в БД ✅")
+    st.success("Прогноз успешно сгенерирован и записан в PostgreSQL!")
 else:
-    col2.metric("Прогноз", "—", help="Нажмите 'Сгенерировать прогноз'")
-    col3.metric("Модель", "ARIMA (2,1,2)")
+    col2.metric("Прогноз", "—", help="Нажмите кнопку слева")
+    col3.metric("Статус", "Ожидание")
 
-# График
+# --- График ---
 fig = go.Figure()
 
-# История
+# История (с заливкой снизу, как в Robinhood)
 fig.add_trace(go.Scatter(
     x=hist_df["trade_date"], y=hist_df["close"],
     mode="lines", name="История",
-    line=dict(color="#3B82F6", width=2),
+    line=dict(color="#4A90E2", width=3),
+    fill='tozeroy', fillcolor='rgba(74, 144, 226, 0.1)', # Голубая заливка
     hovertemplate="Дата: %{x}<br>Цена: $%{y:.2f}<extra></extra>"
 ))
 
 if predict_btn and forecast_df is not None:
-    # Прогноз
+    # Прогноз (яркая линия)
     fig.add_trace(go.Scatter(
         x=forecast_df["target_date"], y=forecast_df["predicted_price"],
-        mode="lines+markers", name="Прогноз ARIMA",
-        line=dict(color="#10B981", width=2, dash="dot"),
-        marker=dict(size=6),
+        mode="lines+markers", name="Прогноз",
+        line=dict(color="#27AE60", width=3, dash="dot"),
+        marker=dict(size=8, color="#27AE60"),
         hovertemplate="Дата: %{x}<br>Прогноз: $%{y:.2f}<extra></extra>"
     ))
-    # Линия соединения
+    # Соединяющая линия
     fig.add_trace(go.Scatter(
         x=[hist_df["trade_date"].iloc[-1], forecast_df["target_date"].iloc[0]],
         y=[last_price, float(forecast_df["predicted_price"].iloc[0])],
-        mode="lines", line=dict(color="#10B981", width=1, dash="dot"),
+        mode="lines", line=dict(color="#27AE60", width=2, dash="dot"),
         showlegend=False, hoverinfo="skip"
     ))
 
 fig.update_layout(
     height=500,
-    margin=dict(l=20, r=20, t=20, b=20),
+    title=f"Динамика акций {symbol}",
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    xaxis=dict(showgrid=True, gridcolor="#E2E8F0", title=""),
-    yaxis=dict(showgrid=True, gridcolor="#E2E8F0", title="Цена, USD", tickprefix="$"),
+    xaxis=dict(showgrid=True, gridcolor="#e0e0e0"),
+    yaxis=dict(showgrid=True, gridcolor="#e0e0e0", title="Цена, USD", tickprefix="$"),
     hovermode="x unified",
+    margin=dict(l=40, r=40, t=60, b=40),
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
 )
-st.plotly_chart(fig, width="stretch")
+st.plotly_chart(fig, use_container_width=True)
 
-# Таблица последних прогнозов
-st.divider()
-st.subheader("Последние прогнозы в базе")
+# --- Таблица последних прогнозов ---
+st.write("---")
+st.subheader("📋 Последние записи в базе (VIEW latest_predictions)")
+st.caption("Таблица показывает, что результаты работы модели физически сохраняются в БД.")
+
 recent = load_recent_predictions(10)
-st.dataframe(
-    recent, 
-    width="stretch", 
-    hide_index=True,
-    column_config={
-        "predicted_price": st.column_config.NumberColumn("Цена", format="$%.2f"),
-        "prediction_date": st.column_config.DatetimeColumn("Дата прогноза", format="D MMM YYYY, HH:mm"),
-        "target_date": st.column_config.DateColumn("На дату", format="D MMM YYYY"),
-    }
-)
+if not recent.empty:
+    st.dataframe(
+        recent, 
+        use_container_width=True, 
+        hide_index=True,
+        column_config={
+            "predicted_price": st.column_config.NumberColumn("Цена", format="$%.2f"),
+            "target_date": st.column_config.DateColumn("На дату", format="DD.MM.YYYY"),
+            "prediction_date": st.column_config.DatetimeColumn("Время прогноза", format="DD.MM.YYYY HH:mm"),
+        }
+    )
+else:
+    st.write("Пока нет сохраненных прогнозов. Нажмите кнопку 'Сделать прогноз'.")
