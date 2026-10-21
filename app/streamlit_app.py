@@ -126,7 +126,7 @@ with st.sidebar:
     days = st.slider("Горизонт (торговых дней)", 7, 30, 14)
     lookback = st.selectbox("История для обучения (дней)", [365, 730, 1095, 1825], index=1,
                             format_func=lambda d: f"{d} дн. (~{d // 365} г.)")
-    predict_btn = st.button("Сгенерировать прогноз", type="primary", use_container_width=True)
+    predict_btn = st.button("Сгенерировать прогноз", type="primary", width="stretch")
     st.divider()
     st.caption("Данные: Yahoo Finance\nМодель: ARIMA(2,1,2)\nБД: PostgreSQL")
 
@@ -196,7 +196,7 @@ fig.update_layout(
     hovermode="x unified",
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
 )
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 
 # Таблица последних прогнозов
 st.divider()
@@ -204,7 +204,7 @@ st.subheader("Последние прогнозы в базе")
 recent = load_recent_predictions(10)
 st.dataframe(
     recent, 
-    use_container_width=True, 
+    width="stretch", 
     hide_index=True,
     column_config={
         "predicted_price": st.column_config.NumberColumn("Цена", format="$%.2f"),
