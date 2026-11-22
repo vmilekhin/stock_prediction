@@ -14,6 +14,8 @@ from etl.db import DB_CONFIG
 from etl.predict import backtest, fit_and_forecast, get_ticker, load_history, save_predictions
 
 LOOKBACK_DAYS = 730
+PROJECT_YEAR = 2026  # год создания проекта
+AUTHORS = "Милехин Виктор · Пономарев Александр"
 MODEL_LABELS = {
     "arima": "ARIMA(2,1,2)",
     "naive": "Наивный (последняя цена)",
@@ -193,4 +195,13 @@ st.dataframe(
         "predicted_price": st.column_config.NumberColumn("Прогноз", format="$%.2f"),
         "model_name": st.column_config.TextColumn("Модель"),
     },
+)
+
+# Подвал: авторы и год создания
+st.divider()
+st.markdown(
+    "<div style='text-align:center; color:#8a8a8a; font-size:0.85rem; padding:8px 0 16px;'>"
+    f"© {PROJECT_YEAR} · {AUTHORS}"
+    "</div>",
+    unsafe_allow_html=True,
 )
