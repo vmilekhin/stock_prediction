@@ -1,28 +1,30 @@
 """
 ETL: загрузка исторических котировок из Yahoo Finance в PostgreSQL.
+
 Использование:
-    python etl/load_prices.py                # все тикеры, 5 лет
-    python etl/load_prices.py --period 2y    # все тикеры, 2 года
-    python etl/load_prices.py --symbol AAPL  # только AAPL
+    python -m etl.load_prices                # все тикеры, 5 лет
+    python -m etl.load_prices --period 2y    # все тикеры, 2 года
+    python -m etl.load_prices --symbol AAPL  # только AAPL
 """
 import argparse
 import sys
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
-import psycopg2
 from psycopg2.extras import execute_values
-import yfinance as yf
 
+if __package__ in (None, ""):  # запуск как `python etl/load_prices.py`
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-DB_CONFIG = {"dbname": "stock_prediction"}  # локальный сокет, peer auth
+from etl.db import connect  # noqa: E402
 
 
 def get_tickers(conn, symbol=None):
     """Возвращает [(id, symbol), ...] из таблицы tickers."""
     with conn.cursor() as cur:
         if symbol:
-            cur.execute("SELECT id, symbol FROM tickers WHERE symbol = %s", (symbol,))
+            cur.execute("SELECT id, symbol FROM tickers WHERE symbol = %s", (symbol.upper(),))
         else:
             cur.execute("SELECT id, symbol FROM tickers ORDER BY id")
         return cur.fetchall()
@@ -30,7 +32,14 @@ def get_tickers(conn, symbol=None):
 
 def fetch_prices(symbol: str, period: str) -> pd.DataFrame:
     """Качает OHLCV через yfinance. Возвращает DataFrame с датой в индексе."""
-    df = yf.download(symbol, period=period, progress=False, auto_adjust=False)
+    try:
+        import yfinance as yf
+    except ImportError as exc:  # понятная ошибка вместо ImportError из недр
+        raise RuntimeError("Не установлен yfinance: pip install yfinance") from exc
+
+    # auto_adjust=True: цены скорректированы на сплиты и дивиденды,
+    # иначе в истории появляются фиктивные «обвалы» на сплитах.
+    df = yf.download(symbol, period=period, progress=False, auto_adjust=True)
     if df.empty:
         return df
     # В новых версиях yfinance колонки — MultiIndex (field, ticker).
@@ -82,6 +91,7 @@ def upsert_prices(conn, ticker_id: int, df: pd.DataFrame) -> int:
 def _num(v):
     return None if pd.isna(v) else float(v)
 
+
 def _int(v):
     return None if pd.isna(v) else int(v)
 
@@ -93,25 +103,39 @@ def main():
     args = parser.parse_args()
 
     started = datetime.now()
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = connect()
     try:
         tickers = get_tickers(conn, args.symbol)
         if not tickers:
-            print(f"Нет тикеров в БД (symbol={args.symbol})", file=sys.stderr)
+            if args.symbol:
+                print(f"Тикер {args.symbol.upper()} не найден в таблице tickers", file=sys.stderr)
+            else:
+                print("Таблица tickers пуста — примените sql/seed_tickers.sql", file=sys.stderr)
             return 1
 
-        total = 0
+        total, failed = 0, []
         for ticker_id, symbol in tickers:
             print(f"[{symbol}] качаю {args.period}...", flush=True)
-            df = fetch_prices(symbol, args.period)
-            if df.empty:
-                print(f"[{symbol}] нет данных — пропускаю", file=sys.stderr)
+            try:
+                df = fetch_prices(symbol, args.period)
+                if df.empty:
+                    print(f"[{symbol}] Yahoo Finance не вернул данных — пропускаю", file=sys.stderr)
+                    failed.append(symbol)
+                    continue
+                n = upsert_prices(conn, ticker_id, df)
+            except Exception as exc:  # один битый тикер не должен ронять весь ETL
+                conn.rollback()
+                print(f"[{symbol}] ошибка: {exc}", file=sys.stderr)
+                failed.append(symbol)
                 continue
-            n = upsert_prices(conn, ticker_id, df)
+
             total += n
             print(f"[{symbol}] +{n} строк (всего {total})", flush=True)
 
         print(f"\nГотово за {datetime.now() - started}. Вставлено/обновлено: {total}")
+        if failed:
+            print(f"Не удалось загрузить: {', '.join(failed)}", file=sys.stderr)
+            return 1
         return 0
     finally:
         conn.close()
