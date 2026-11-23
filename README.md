@@ -3,6 +3,9 @@
 Учебный проект: ETL исторических котировок в PostgreSQL, прогноз цены моделью ARIMA
 и веб-интерфейс на Streamlit.
 
+Подробное описание устройства проекта (слои, функции, схема БД) — в
+[ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Стек
 
 | Слой | Технология |
@@ -24,6 +27,7 @@
 ├── sql/
 │   ├── schema.sql         # таблицы, индексы, view latest_predictions
 │   └── seed_tickers.sql   # справочник 30 тикеров
+├── ARCHITECTURE.md        # архитектура, функции, схема БД
 ├── Dockerfile
 ├── docker-compose.yml
 ├── Makefile
